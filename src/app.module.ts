@@ -8,6 +8,7 @@ import { UserModule } from './user/user.module';
 import { AuthModule } from './auth/auth.module';
 import { User } from './user/entities/user/user';
 import { MongooseModule } from '@nestjs/mongoose'; 
+import { WalletModule } from './wallet/wallet.module';
 
 @Module({
   imports: [
@@ -25,6 +26,7 @@ import { MongooseModule } from '@nestjs/mongoose';
     MongooseModule.forRoot('mongodb://127.0.0.1:27017/wallet_system'),
     AuthModule,
     UserModule,
+    WalletModule,
   ],
 })
 export class AppModule {}
