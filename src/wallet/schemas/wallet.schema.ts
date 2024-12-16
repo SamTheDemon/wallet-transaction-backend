@@ -1,6 +1,6 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document } from 'mongoose';
-import * as mongoose from 'mongoose';
+
 
 @Schema()
 export class Wallet extends Document {
@@ -12,6 +12,15 @@ export class Wallet extends Document {
   
   @Prop({ type: String, required: true })
   user: string;
+  
+  @Prop({
+    required: true,
+    default: function () {
+      return this.walletNumber; // Default to walletNumber if name is not provided
+    },
+  })
+  name: string;
+
 }
 
 export const WalletSchema = SchemaFactory.createForClass(Wallet);
