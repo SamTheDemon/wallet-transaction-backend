@@ -21,6 +21,8 @@ export class Wallet extends Document {
   })
   name: string;
 
+  @Prop({ type: String, default: 'SAR', required: true })
+  currency: string;
 }
 
 export const WalletSchema = SchemaFactory.createForClass(Wallet);

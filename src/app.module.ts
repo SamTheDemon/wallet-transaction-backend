@@ -9,6 +9,11 @@ import { AuthModule } from './auth/auth.module';
 import { User } from './user/entities/user/user';
 import { MongooseModule } from '@nestjs/mongoose'; 
 import { WalletModule } from './wallet/wallet.module';
+import { TransactionModule } from './transaction/transaction.module';
+
+
+import { CurrencyModule } from './currency/currency.module';
+
 
 @Module({
   imports: [
@@ -27,6 +32,8 @@ import { WalletModule } from './wallet/wallet.module';
     AuthModule,
     UserModule,
     WalletModule,
+    TransactionModule,
+    CurrencyModule,
   ],
 })
 export class AppModule {}

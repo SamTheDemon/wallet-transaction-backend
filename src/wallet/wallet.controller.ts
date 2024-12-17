@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Body, Request, UseGuards } from '@nestjs/common';
+import { Controller, Post, Get, Body, Req,Request, UseGuards } from '@nestjs/common';
 import { WalletService } from './wallet.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { TransferDto } from './dto/transfer.dto';
@@ -11,10 +11,11 @@ export class WalletController {
   @Post('create')
   async createWallet(
     @Request() req,
-    @Body() body: { walletNumber: string; initialBalance: number; name?: string },
+    @Body() body: { walletNumber: string; initialBalance: number; name?: string},
   ) {
     const userId = String(req.user.id);
-    return this.walletService.createWallet(body.walletNumber, body.initialBalance, userId, body.name);
+    return this.walletService.createWallet(userId, body);
+
   }
 
   @UseGuards(JwtAuthGuard)
@@ -27,8 +28,28 @@ export class WalletController {
 
   @UseGuards(JwtAuthGuard)
   @Post('transfer')
-  async transfer(@Body() transferDto: TransferDto) {
-    const { fromWallet, toWallet, amount } = transferDto;
-    return this.walletService.transferMoney(fromWallet, toWallet, amount);
+  async transferMoney(
+    @Req() req,
+    @Body()
+    body: {
+      fromWallet: string;
+      toWallet: string;
+      amount: number;
+      fromCurrency: string;
+      toCurrency: string;
+      recipientName: string; // Ensure recipientName is part of the request body
+    },
+  ) {
+    const userId = req.user.id; // Extract user ID from the authenticated request
+    return this.walletService.transferMoney(
+      userId,
+      body.fromWallet,
+      body.toWallet,
+      body.amount,
+      body.fromCurrency,
+      body.toCurrency,
+      body.recipientName, // Pass recipientName as the last parameter
+    );
   }
+  
 }
