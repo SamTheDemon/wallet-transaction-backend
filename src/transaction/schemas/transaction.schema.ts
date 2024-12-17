@@ -17,11 +17,24 @@ export class Transaction extends Document {
   @Prop({ required: true })
   recipientName: string;
 
-  @Prop({ required: true })
-  amount: number;
 
   @Prop({ required: true })
-  status: string; // e.g., 'Success' or 'Failed'
+  senderCurrency: string;
+
+  @Prop({ required: true })
+  recipientCurrency: string;
+
+  @Prop({ required: true })
+  amountSent: number; 
+
+  @Prop({ required: true })
+  amountReceived: number;
+
+  @Prop({ required: true })
+  conversionRate: number;
+
+  @Prop({ required: true })
+  status: string;
 
   @Prop({ default: Date.now })
   timestamp: Date;

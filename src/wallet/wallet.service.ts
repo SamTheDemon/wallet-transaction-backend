@@ -108,13 +108,17 @@ export class WalletService {
       await senderWallet.save({ session });
       await receiverWallet.save({ session });
   
-          // Log the transaction
+      // Log the transaction
       const transaction = new this.transactionModel({
         transactionId: Date.now().toString(),
         senderWallet: fromWallet,
         recipientWallet: toWallet,
         recipientName: recipientName,
-        amount: amount,
+        senderCurrency: fromCurrency, 
+        recipientCurrency: toCurrency, 
+        amountSent: amount, 
+        amountReceived: convertedAmount, 
+        conversionRate: conversionRate,
         status: 'Success',
         timestamp: new Date(),
       });
@@ -143,43 +147,6 @@ export class WalletService {
     }
   }
   
-
-  // async transferMoney(fromWallet: string, toWallet: string, amount: number): Promise<{ message: string }> {
-  //   const session = await this.connection.startSession();
-  //   session.startTransaction();
-
-  //   try {
-  //     const senderWallet = await this.walletModel.findOne({ walletNumber: fromWallet }).session(session);
-  //     const receiverWallet = await this.walletModel.findOne({ walletNumber: toWallet }).session(session);
-
-  //     if (!senderWallet || !receiverWallet) {
-  //       throw new BadRequestException('One or both wallets do not exist');
-  //     }
-
-  //     if (senderWallet.balance < amount) {
-  //       throw new BadRequestException('Insufficient balance in sender\'s wallet');
-  //     }
-
-  //     senderWallet.balance -= amount;
-  //     receiverWallet.balance += amount;
-
-  //     await senderWallet.save({ session });
-  //     await receiverWallet.save({ session });
-
-  //     // Notify clients about the updated balances
-  //     this.realtimeGateway.sendBalanceUpdate(senderWallet._id.toString(), senderWallet.balance);
-  //     this.realtimeGateway.sendBalanceUpdate(receiverWallet._id.toString(), receiverWallet.balance);
-
-  //     await session.commitTransaction();
-  //     session.endSession();
-
-  //     return { message: 'Transfer successful' };
-  //   } catch (error) {
-  //     await session.abortTransaction();
-  //     session.endSession();
-  //     throw error;
-  //   }
-  // }
 
 
 }
