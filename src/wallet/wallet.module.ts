@@ -16,8 +16,10 @@ import { Transaction, TransactionSchema } from 'src/transaction/schemas/transact
 
 @Module({
   imports: [
-    MongooseModule.forFeature([{ name: Transaction.name, schema: TransactionSchema }]),
-    MongooseModule.forFeature([{ name: Wallet.name, schema: WalletSchema }]),
+    MongooseModule.forFeature([
+      { name: Transaction.name, schema: TransactionSchema },
+      { name: Wallet.name, schema: WalletSchema },
+    ]),
     TransactionModule, 
     RealtimeModule,
     RedisModule,

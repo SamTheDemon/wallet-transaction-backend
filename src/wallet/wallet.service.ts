@@ -1,8 +1,7 @@
 import { Injectable, ConflictException, BadRequestException } from '@nestjs/common';
-import { InjectModel } from '@nestjs/mongoose';
+import { InjectModel, InjectConnection } from '@nestjs/mongoose';
 import { Model,Connection } from 'mongoose';
 import { Wallet } from './schemas/wallet.schema';
-import { InjectConnection } from '@nestjs/mongoose';
 import { TransactionService } from '../transaction/transaction.service';
 import { Transaction, TransactionDocument } from '../transaction/schemas/transaction.schema';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
@@ -26,42 +25,36 @@ export class WalletService {
 
   ) {}
 
-  async createWallet(userId: string, walletDto: { walletNumber: string; initialBalance: number; name?: string; currency?: string }): Promise<Wallet> {
-    
-    try{
 
+  // 1- create wallet:
+  async createWallet( userId: string, walletDto: { walletNumber: string; initialBalance: number; name?: string; currency?: string },  ): Promise<Wallet> {
+    try {
       const { walletNumber, initialBalance, name, currency } = walletDto;
-    
       const newWallet = new this.walletModel({
         walletNumber,
         balance: initialBalance,
         user: userId,
         name: name || walletNumber,
-        currency: currency || 'SAR', // Default to SAR
+        currency: currency || 'SAR',
       });
-    
+
       return await newWallet.save();
-    } catch(error) {
-      //Handle the MongoDB  duplicate key error
-      if (error.code === 11000 && error.keyPattern.walletNumber){
-        throw new BadRequestException("Wallet number already exists")
+    } catch (error) {
+      if (error.code === 11000 && error.keyPattern.walletNumber) {
+        throw new BadRequestException('Wallet number already exists');
       }
       throw error;
     }
   }
-  
-
+  // 2- Get Wallets for a User
   async getWalletsForUser(userId: string): Promise<{ wallets: Wallet[]; totalWallets: number }> {
-    const wallets = await this.walletModel
-      .find({ user: userId })
-      .select('-__v') // Exclude the __v field
-      .exec();
-  
+    const wallets = await this.walletModel.find({ user: userId }).select('-__v').exec();
     const totalWallets = await this.walletModel.countDocuments({ user: userId });
-  
     return { wallets, totalWallets };
   }
 
+  
+  // 3. Transfer Money Between Wallets
   async transferMoney(
     userId: string,
     fromWallet: string,
@@ -73,71 +66,32 @@ export class WalletService {
   ): Promise<{ message: string; details: any }> {
     const session = await this.connection.startSession();
     session.startTransaction();
-  
+
     try {
-      const senderWallet = await this.walletModel.findOne({ walletNumber: fromWallet, user: userId }).session(session);
-      const receiverWallet = await this.walletModel.findOne({ walletNumber: toWallet }).session(session);
-  
-      if (!senderWallet || !receiverWallet) {
-        throw new BadRequestException('One or both wallets do not exist');
-      }
-  
-      // Fetch the recipient user details using TypeORM
-      const recipientUser = await this.userRepository.findOne({
-        where: { id: Number(receiverWallet.user) }, // Convert to number
-      });
-      if (!recipientUser) {
-        throw new BadRequestException('Recipient user not found');
-      }
-  
-      // Compare the provided name with the recipient's actual name
-      if (recipientUser.name !== recipientName) {
-        throw new BadRequestException('Recipient name and wallet number do not match');
-      }
-  
-      if (senderWallet.balance < amount) {
-        throw new BadRequestException('Insufficient balance');
-      }
-  
+      const senderWallet = await this.validateSenderWallet(userId, fromWallet, session);
+      const receiverWallet = await this.validateReceiverWallet(toWallet, recipientName, session);
+
+      this.ensureSufficientBalance(senderWallet, amount);
+
       const conversionRate = await this.currencyService.getConversionRate(fromCurrency, toCurrency);
       const convertedAmount = amount * conversionRate;
-  
-      senderWallet.balance -= amount;
-      receiverWallet.balance += convertedAmount;
-  
-      await senderWallet.save({ session });
-      await receiverWallet.save({ session });
-  
-      // Log the transaction
-      const transaction = new this.transactionModel({
-        transactionId: Date.now().toString(),
-        senderWallet: fromWallet,
-        recipientWallet: toWallet,
-        recipientName: recipientName,
-        senderCurrency: fromCurrency, 
-        recipientCurrency: toCurrency, 
-        amountSent: amount, 
-        amountReceived: convertedAmount, 
-        conversionRate: conversionRate,
-        status: 'Success',
-        timestamp: new Date(),
-      });
-      await transaction.save({ session });
+
+      await this.updateBalances(senderWallet, receiverWallet, amount, convertedAmount, session);
+      await this.logTransaction(senderWallet, receiverWallet, amount, convertedAmount, conversionRate, fromCurrency, toCurrency, recipientName, session);
 
       await session.commitTransaction();
       session.endSession();
-  
+
       return {
         message: 'Transfer successful',
         details: {
           fromWallet: senderWallet.walletNumber,
           toWallet: receiverWallet.walletNumber,
-          amount,
-          convertedAmount,
+          amountSent: amount,
+          amountReceived: convertedAmount,
+          conversionRate,
           fromCurrency,
           toCurrency,
-          conversionRate,
-          timestamp: new Date(),
         },
       };
     } catch (error) {
@@ -146,13 +100,67 @@ export class WalletService {
       throw error;
     }
   }
-  
 
 
+// --- Private Helper Methods ---
+
+  private async validateSenderWallet(userId: string, fromWallet: string, session: any) {
+    const senderWallet = await this.walletModel.findOne({ walletNumber: fromWallet, user: userId }).session(session);
+    if (!senderWallet) throw new BadRequestException('Sender wallet not found');
+    return senderWallet;
+  }
+
+  private async validateReceiverWallet(toWallet: string, recipientName: string, session: any) {
+    const receiverWallet = await this.walletModel.findOne({ walletNumber: toWallet }).session(session);
+    if (!receiverWallet) throw new BadRequestException('Recipient wallet not found');
+
+    const recipientUser = await this.userRepository.findOne({ where: { id: Number(receiverWallet.user) } });
+    if (!recipientUser || recipientUser.name !== recipientName) {
+      throw new BadRequestException('Recipient name and wallet number do not match');
+    }
+
+    return receiverWallet;
+  }
+
+  private ensureSufficientBalance(wallet: Wallet, amount: number) {
+    if (wallet.balance < amount) {
+      throw new BadRequestException('Insufficient balance');
+    }
+  }
+
+  private async updateBalances(senderWallet: Wallet, receiverWallet: Wallet, amount: number, convertedAmount: number, session: any) {
+    senderWallet.balance -= amount;
+    receiverWallet.balance += convertedAmount;
+
+    await senderWallet.save({ session });
+    await receiverWallet.save({ session });
+  }
+
+  private async logTransaction(
+    senderWallet: Wallet,
+    receiverWallet: Wallet,
+    amountSent: number,
+    amountReceived: number,
+    conversionRate: number,
+    fromCurrency: string,
+    toCurrency: string,
+    recipientName: string,
+    session: any,
+  ) {
+    const transaction = new this.transactionModel({
+      transactionId: Date.now().toString(),
+      senderWallet: senderWallet.walletNumber,
+      recipientWallet: receiverWallet.walletNumber,
+      recipientName,
+      senderCurrency: fromCurrency,
+      recipientCurrency: toCurrency,
+      amountSent,
+      amountReceived,
+      conversionRate,
+      status: 'Success',
+      timestamp: new Date(),
+    });
+    await transaction.save({ session });
+  }
 }
-
-
-
-
-
 
