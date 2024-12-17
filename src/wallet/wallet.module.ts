@@ -11,22 +11,24 @@ import { RedisModule } from '../redis/redis.module';
 import { CurrencyModule } from '../currency/currency.module'; // Import CurrencyModule
 import { UserModule } from '../user/user.module'; // Import UserModule
 import { Transaction, TransactionSchema } from 'src/transaction/schemas/transaction.schema';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { User } from 'src/user/entities/user/user';
+import { CurrencyService } from 'src/currency/currency.service';
+
 
 
 
 @Module({
   imports: [
-    MongooseModule.forFeature([
-      { name: Transaction.name, schema: TransactionSchema },
-      { name: Wallet.name, schema: WalletSchema },
-    ]),
+    MongooseModule.forFeature([{ name: Wallet.name, schema: WalletSchema }]),
     TransactionModule, 
     RealtimeModule,
     RedisModule,
     CurrencyModule,
     UserModule, 
+    TypeOrmModule.forFeature([User]),
   ],
-  providers: [WalletService, RealtimeGateway],
+  providers: [WalletService, CurrencyService, RealtimeGateway],
   controllers: [WalletController],
   exports: [WalletService]
 })
