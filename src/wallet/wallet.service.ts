@@ -4,10 +4,10 @@ import { Model,Connection } from 'mongoose';
 import { Wallet } from './schemas/wallet.schema';
 import { InjectConnection } from '@nestjs/mongoose';
 import { TransactionService } from '../transaction/transaction.service';
-import { Transaction } from '../transaction/schemas/transaction.schema';
+import { Transaction, TransactionDocument } from '../transaction/schemas/transaction.schema';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
 import { CurrencyService } from '../currency/currency.service';
-import { User } from '../user/entities/user/user'; // Update with the correct path
+import { User } from '../user/entities/user/user'; 
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 
@@ -18,10 +18,11 @@ export class WalletService {
   constructor(
     @InjectModel(Wallet.name) private walletModel: Model<Wallet>,
     @InjectConnection() private connection: Connection,
+    @InjectModel(Transaction.name) private readonly transactionModel: Model<TransactionDocument>, 
     private readonly transactionService: TransactionService,
     private readonly realtimeGateway: RealtimeGateway,
     private readonly currencyService: CurrencyService,
-    @InjectRepository(User) private readonly userRepository: Repository<User>, // Inject User repository
+    @InjectRepository(User) private readonly userRepository: Repository<User>, 
 
   ) {}
 
@@ -107,6 +108,18 @@ export class WalletService {
       await senderWallet.save({ session });
       await receiverWallet.save({ session });
   
+          // Log the transaction
+      const transaction = new this.transactionModel({
+        transactionId: Date.now().toString(),
+        senderWallet: fromWallet,
+        recipientWallet: toWallet,
+        recipientName: recipientName,
+        amount: amount,
+        status: 'Success',
+        timestamp: new Date(),
+      });
+      await transaction.save({ session });
+
       await session.commitTransaction();
       session.endSession();
   

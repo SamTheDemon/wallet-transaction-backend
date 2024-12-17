@@ -10,10 +10,13 @@ import { RealtimeGateway } from '../realtime/realtime.gateway'; // If used
 import { RedisModule } from '../redis/redis.module';
 import { CurrencyModule } from '../currency/currency.module'; // Import CurrencyModule
 import { UserModule } from '../user/user.module'; // Import UserModule
+import { Transaction, TransactionSchema } from 'src/transaction/schemas/transaction.schema';
+
 
 
 @Module({
   imports: [
+    MongooseModule.forFeature([{ name: Transaction.name, schema: TransactionSchema }]),
     MongooseModule.forFeature([{ name: Wallet.name, schema: WalletSchema }]),
     TransactionModule, 
     RealtimeModule,

@@ -1,6 +1,8 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document } from 'mongoose';
 
+export type TransactionDocument = Transaction & Document;
+
 @Schema()
 export class Transaction extends Document {
   @Prop({ required: true, unique: true })
@@ -23,6 +25,7 @@ export class Transaction extends Document {
 
   @Prop({ default: Date.now })
   timestamp: Date;
+
 }
 
 export const TransactionSchema = SchemaFactory.createForClass(Transaction);
