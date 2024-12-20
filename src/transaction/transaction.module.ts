@@ -3,10 +3,10 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { Transaction, TransactionSchema } from './schemas/transaction.schema';
 import { TransactionService } from './transaction.service';
 import { TransactionController } from './transaction.controller';
+import { Wallet, WalletSchema } from 'src/wallet/schemas/wallet.schema';
+import { CurrencyModule } from '../currency/currency.module'; 
 // import { TypeOrmModule } from '@nestjs/typeorm';
 // import { Transaction } from './entities/transaction';
-import { Wallet, WalletSchema } from 'src/wallet/schemas/wallet.schema';
-import { CurrencyModule } from '../currency/currency.module'; // Import this
 
 @Module({
 

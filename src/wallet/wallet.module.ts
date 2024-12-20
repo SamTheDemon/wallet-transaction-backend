@@ -5,11 +5,10 @@ import { WalletController } from './wallet.controller';
 import { Wallet, WalletSchema } from './schemas/wallet.schema';
 import { TransactionModule } from '../transaction/transaction.module';
 import { RealtimeModule } from '../realtime/realtime.module';
-import { RealtimeGateway } from '../realtime/realtime.gateway'; // If used
-
+import { RealtimeGateway } from '../realtime/realtime.gateway'; // needs to be enabled on front end
 import { RedisModule } from '../redis/redis.module';
-import { CurrencyModule } from '../currency/currency.module'; // Import CurrencyModule
-import { UserModule } from '../user/user.module'; // Import UserModule
+import { CurrencyModule } from '../currency/currency.module';
+import { UserModule } from '../user/user.module'; 
 import { Transaction, TransactionSchema } from 'src/transaction/schemas/transaction.schema';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { User } from 'src/user/entities/user/user';
@@ -20,7 +19,7 @@ import { CurrencyService } from 'src/currency/currency.service';
 
 @Module({
   imports: [
-    MongooseModule.forFeature([{ name: Wallet.name, schema: WalletSchema },       { name: Transaction.name, schema: TransactionSchema }  // Add this line
+    MongooseModule.forFeature([{ name: Wallet.name, schema: WalletSchema },       { name: Transaction.name, schema: TransactionSchema }  
     ]),
     TransactionModule, 
     RealtimeModule,

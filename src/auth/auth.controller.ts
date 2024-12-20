@@ -14,7 +14,7 @@ export class AuthController {
 
   ) {}
 
-
+// 1- Registers a new user with the provided details and returns the user data excluding the password.
     @Post('register')
     @UsePipes(ValidationPipe)
     async register(@Body() userDto: RegisterDto) {
@@ -26,7 +26,7 @@ export class AuthController {
       };
     }
 
-
+// 2- Authenticates the user and returns access and refresh tokens upon successful login.
     @Post('login')
     @UsePipes(ValidationPipe)
     async login(@Body() loginDto: LoginDto) {
@@ -38,7 +38,7 @@ export class AuthController {
       };
     }
     
-
+// 3- Logs out the authenticated user by blacklisting the provided token.
     @UseGuards(JwtAuthGuard)
     @Post('logout')
     logout(@Req() req) {
@@ -50,6 +50,7 @@ export class AuthController {
       return { message: 'Logout successful' };
     }
 
+    // 4- Generates a new access token using a valid refresh token.
    @Post('refresh-token')
   async refreshToken(@Body('refresh_token') refreshToken: string) {
     const validated = this.authService.validateRefreshToken(refreshToken);

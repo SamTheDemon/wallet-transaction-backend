@@ -4,7 +4,7 @@ import { RedisModule } from '../redis/redis.module';
 
 
 @Module({
-  imports: [RedisModule], // Import RedisModule
+  imports: [RedisModule], 
   providers: [CurrencyService],
   exports: [CurrencyService],
 })

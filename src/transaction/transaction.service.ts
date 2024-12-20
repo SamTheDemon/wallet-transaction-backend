@@ -4,10 +4,10 @@ import { Model } from 'mongoose';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Transaction } from './entities/transaction';
-// import { SelectQueryBuilder } from 'typeorm';
 import { Wallet } from 'src/wallet/schemas/wallet.schema';
-// import { In,Between } from 'typeorm';
 import { CurrencyService } from 'src/currency/currency.service';
+// import { SelectQueryBuilder } from 'typeorm';
+// import { In,Between } from 'typeorm';
 
 
 interface FilterOptions {
@@ -26,6 +26,7 @@ interface FilterOptions {
 @Injectable()
 export class TransactionService {
   constructor(
+    //commented because i switched Transaction from SQL to Mongodb
     // @InjectRepository(Transaction)
     // private readonly transactionRepository: Repository<Transaction>,
     @InjectModel(Transaction.name) private readonly transactionModel: Model<Transaction>,
@@ -33,12 +34,13 @@ export class TransactionService {
     private readonly currencyService: CurrencyService, 
   ) {}
 
-
+  // 1- Creates a new transaction in the system.
   async createTransaction(transactionDto: Partial<Transaction>): Promise<Transaction> {
     const transaction = new this.transactionModel(transactionDto);
     return await transaction.save();
   }
 
+  // 2-Retrieves all transactions associated with the authenticated user, paginated.
   async getTransactionsForUser(
     userId: string,
     page = 1,
@@ -77,6 +79,7 @@ export class TransactionService {
     return { transactions: enrichedTransactions, total };
   }
 
+  // 3- Retrieves transactions for the authenticated user based on filter options.
   async getFilteredTransactions(options: FilterOptions) {
     const {
       userId,
@@ -136,7 +139,7 @@ export class TransactionService {
       limit,
     };
   }
-
+  // 4- Retrieves an overview of transactions for the last 7 days for the authenticated user.
   async getLast7DaysOverview(userId: string) {
     const userWallets = await this.walletModel.find({ user: userId }).exec();
     const userWalletNumbers = userWallets.map(w => w.walletNumber);

@@ -24,13 +24,12 @@ export class WalletService {
     private readonly currencyService: CurrencyService,
     @InjectRepository(User) private readonly userRepository: Repository<User>, 
     private readonly dataSource: DataSource, 
-    // @InjectRepository(Transaction) private readonly transactionRepository: Repository<Transaction>, 
     @InjectModel(Transaction.name) private transactionModel: Model<Transaction>,
 
   ) {}
 
 
-  // 1- create wallet:
+  // 1- create wallet: Creates a new wallet for a user with the specified details.
   async createWallet( userId: string, walletDto: { walletNumber: string; initialBalance: number; name?: string; currency?: string },  ): Promise<Wallet> {
     try {
       const { walletNumber, initialBalance, name, currency } = walletDto;
@@ -50,17 +49,23 @@ export class WalletService {
       throw error;
     }
   }
-  // 2- Get Wallets for a User
+
+
+  // 2- Retrieves all wallets associated with a specific user, along with the total count.
   async getWalletsForUser(userId: string): Promise<{ wallets: Wallet[]; totalWallets: number }> {
     const wallets = await this.walletModel.find({ user: userId }).select('-__v').exec();
     const totalWallets = await this.walletModel.countDocuments({ user: userId });
     return { wallets, totalWallets };
   }
 
-  
 
-    // 3. Transfer Money Between Wallets for MongoDB
-    async transferMoney(
+
+
+  /**
+   * 
+    // 3- Transfers money between two wallets, including currency conversion and transactional consistency.
+   */
+  async transferMoney(
       userId: string,
       fromWallet: string,
       toWallet: string,
@@ -176,8 +181,75 @@ export class WalletService {
         session.endSession();
       }
     }
-  
 
+
+    /**
+   * 4- Calculates a user's financial overview, including total balances and monthly transactions in USD.
+   * -- mongodb:
+   */
+    
+    async getFinancialOverview(userId: string): Promise<{
+      totalBalanceInUSD: number;
+      monthlyIncomingInUSD: number;
+      monthlyOutgoingInUSD: number;
+    }> {
+      // Get all user wallets
+      const { wallets } = await this.getWalletsForUser(userId);
+      const walletNumbers = wallets.map(w => w.walletNumber);
+
+      // Calculate total balance in USD
+      let totalBalanceInUSD = 0;
+      for (const wallet of wallets) {
+        const conversionRate = await this.currencyService.getConversionRate(
+          wallet.currency, 
+          'USD'
+        );
+        totalBalanceInUSD += wallet.balance * conversionRate;
+      }
+
+      // Get monthly date range
+      const now = new Date();
+      const monthStart = startOfMonth(now);
+      const monthEnd = endOfMonth(now);
+
+      // Get monthly transactions
+      const incomingTransactions = await this.transactionModel.find({
+        recipientWallet: { $in: walletNumbers },
+        timestamp: { $gte: monthStart, $lte: monthEnd },
+        status: 'Success'
+      });
+
+      const outgoingTransactions = await this.transactionModel.find({
+        senderWallet: { $in: walletNumbers },
+        timestamp: { $gte: monthStart, $lte: monthEnd },
+        status: 'Success'
+      });
+
+      // Calculate USD amounts
+      let monthlyIncomingInUSD = 0;
+      for (const tx of incomingTransactions) {
+        const conversionRate = await this.currencyService.getConversionRate(
+          tx.recipientCurrency, 
+          'USD'
+        );
+        monthlyIncomingInUSD += tx.amountReceived * conversionRate;
+      }
+
+      let monthlyOutgoingInUSD = 0;
+      for (const tx of outgoingTransactions) {
+        const conversionRate = await this.currencyService.getConversionRate(
+          tx.senderCurrency, 
+          'USD'
+        );
+        monthlyOutgoingInUSD += tx.amountSent * conversionRate;
+      }
+
+      return {
+        totalBalanceInUSD: parseFloat(totalBalanceInUSD.toFixed(2)),
+        monthlyIncomingInUSD: parseFloat(monthlyIncomingInUSD.toFixed(2)),
+        monthlyOutgoingInUSD: parseFloat(monthlyOutgoingInUSD.toFixed(2)),
+      };
+    }
 
 
   // 3. Transfer Money Between Wallets for SQL
@@ -274,74 +346,7 @@ export class WalletService {
   //     await queryRunner.release();
   //   }
   // }
-  
 
-    /**
-   * Get total balances, monthly incoming, and monthly outgoing in USD for a user.
-   */
-    //mongodb:
-    async getFinancialOverview(userId: string): Promise<{
-      totalBalanceInUSD: number;
-      monthlyIncomingInUSD: number;
-      monthlyOutgoingInUSD: number;
-    }> {
-      // Get all user wallets
-      const { wallets } = await this.getWalletsForUser(userId);
-      const walletNumbers = wallets.map(w => w.walletNumber);
-
-      // Calculate total balance in USD
-      let totalBalanceInUSD = 0;
-      for (const wallet of wallets) {
-        const conversionRate = await this.currencyService.getConversionRate(
-          wallet.currency, 
-          'USD'
-        );
-        totalBalanceInUSD += wallet.balance * conversionRate;
-      }
-
-      // Get monthly date range
-      const now = new Date();
-      const monthStart = startOfMonth(now);
-      const monthEnd = endOfMonth(now);
-
-      // Get monthly transactions
-      const incomingTransactions = await this.transactionModel.find({
-        recipientWallet: { $in: walletNumbers },
-        timestamp: { $gte: monthStart, $lte: monthEnd },
-        status: 'Success'
-      });
-
-      const outgoingTransactions = await this.transactionModel.find({
-        senderWallet: { $in: walletNumbers },
-        timestamp: { $gte: monthStart, $lte: monthEnd },
-        status: 'Success'
-      });
-
-      // Calculate USD amounts
-      let monthlyIncomingInUSD = 0;
-      for (const tx of incomingTransactions) {
-        const conversionRate = await this.currencyService.getConversionRate(
-          tx.recipientCurrency, 
-          'USD'
-        );
-        monthlyIncomingInUSD += tx.amountReceived * conversionRate;
-      }
-
-      let monthlyOutgoingInUSD = 0;
-      for (const tx of outgoingTransactions) {
-        const conversionRate = await this.currencyService.getConversionRate(
-          tx.senderCurrency, 
-          'USD'
-        );
-        monthlyOutgoingInUSD += tx.amountSent * conversionRate;
-      }
-
-      return {
-        totalBalanceInUSD: parseFloat(totalBalanceInUSD.toFixed(2)),
-        monthlyIncomingInUSD: parseFloat(monthlyIncomingInUSD.toFixed(2)),
-        monthlyOutgoingInUSD: parseFloat(monthlyOutgoingInUSD.toFixed(2)),
-      };
-    }
 
 
 

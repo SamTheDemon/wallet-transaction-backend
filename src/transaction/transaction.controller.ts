@@ -7,6 +7,8 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 export class TransactionController {
   constructor(private readonly transactionService: TransactionService) {}
 
+
+  // 1- Retrieves all transactions for the authenticated user, with optional filtering and pagination.
  @UseGuards(JwtAuthGuard)
   @Get('all')
   async getAllTransactions(
@@ -49,6 +51,7 @@ export class TransactionController {
     };
   }
 
+  // 2- Retrieves a 7-day overview of incoming and outgoing transactions for the authenticated user.
   @UseGuards(JwtAuthGuard)
   @Get('7days-overview')
   async getLast7DaysOverview(@Request() req) {

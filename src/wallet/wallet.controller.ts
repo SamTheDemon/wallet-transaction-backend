@@ -10,6 +10,7 @@ export class WalletController {
   constructor(private readonly walletService: WalletService) {}
 
 
+  // 1- Creates a wallet for the authenticated user based on the provided details.
   @UseGuards(JwtAuthGuard)
   @Post('create')
   async createWallet(@Request() req, @Body() body: CreateWalletDto) {
@@ -24,6 +25,7 @@ export class WalletController {
     }
   }
 
+  // 2- Retrieves all wallets associated with the authenticated user.
   @UseGuards(JwtAuthGuard)
   @Get('all')
   async getWallets(@Request() req) {
@@ -32,6 +34,7 @@ export class WalletController {
     return { wallets, totalWallets };
   }
 
+  // 3- Transfers money between wallets for the authenticated user, including currency conversion.
   @UseGuards(JwtAuthGuard)
   @Post('transfer')
   async transferMoney(
@@ -49,7 +52,8 @@ export class WalletController {
       body.recipientName,
     );
   }
-
+  
+  // 4- Retrieves a financial overview for the authenticated user, including balances and transactions.
   @UseGuards(JwtAuthGuard)
   @Get('overview')
   async getFinancialOverview(@Request() req) {

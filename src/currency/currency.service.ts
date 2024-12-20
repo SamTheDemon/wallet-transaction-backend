@@ -3,11 +3,13 @@ import { Redis } from 'ioredis';
 import axios from 'axios';
 
 
+/**
+ * Key Features:
+  Fetch conversion rates from a public API.
+  Cache the rates in Redis for 1 hour (EX, 3600 seconds).
+  Use Redis to quickly retrieve rates if already cached.
+ */
 
-// Key Features:
-// Fetch conversion rates from a public API.
-// Cache the rates in Redis for 1 hour (EX, 3600 seconds).
-// Use Redis to quickly retrieve rates if already cached.
 @Injectable()
 export class CurrencyService {
   constructor(@Inject('REDIS') private readonly redis: Redis) {}

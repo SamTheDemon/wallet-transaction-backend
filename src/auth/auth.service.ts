@@ -16,12 +16,11 @@ export class AuthService {
 
 
   /**
-   * Validate user credentials and return the user without the password
+   * 1- Validate user credentials and return the user without the password
    * @param email - User's email
    * @param password - User's plain text password
    * @returns User object excluding password
    */
-
   async validateUser(email: string, password: string): Promise<any> {
     const user = await this.userService.findByEmail(email);
 
@@ -40,7 +39,7 @@ export class AuthService {
   }
 
     /**
-   * Generate JWT access token for a validated user
+   * 2- Generates an access token and a refresh token for the authenticated user.
    * @param user - User object
    * @returns Object with JWT access_token
    */
@@ -59,19 +58,19 @@ export class AuthService {
       };
     }
 
+    // 3- Logs out the user by blacklisting the provided token
     logout(token: string): void {
       this.blacklistedTokens.add(token);
     }
-  
-    // isTokenBlacklisted(token: string): boolean {
-    //   return this.blacklistedTokens.has(token);
-    // }
 
+    // 4- Generates a refresh token with a 7-day expiration for the given user ID.
     private generateRefreshToken(userId: number): string {
       const payload = { sub: userId };
       return this.jwtService.sign(payload, { expiresIn: '7d' }); // Long-lived token
     }
   
+    // 5- Validates the provided refresh token and ensures it matches the stored token.
+
     validateRefreshToken(token: string): { userId: number } | null {
       try {
         const decoded = this.jwtService.verify(token);
@@ -86,6 +85,7 @@ export class AuthService {
       }
     }
   
+    // 6- Revokes the refresh token associated with the given user ID.
     revokeRefreshToken(userId: number): void {
       this.refreshTokens.delete(userId);
     }

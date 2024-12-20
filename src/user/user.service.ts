@@ -31,7 +31,7 @@ export class UserService {
           // PostgreSQL unique violation error code
           throw new ConflictException('Email already exists');
         }
-        console.error('Error creating user:', error.message); // Log for debugging
+        //console.error('Error creating user:', error.message); // Log for debugging
         throw new InternalServerErrorException('Failed to create user');
       }
   }
