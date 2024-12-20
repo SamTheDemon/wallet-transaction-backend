@@ -1,30 +1,32 @@
+// wallet.service.ts:
 import { Injectable, ConflictException, BadRequestException } from '@nestjs/common';
 import { InjectModel, InjectConnection } from '@nestjs/mongoose';
 import { Model,Connection } from 'mongoose';
 import { Wallet } from './schemas/wallet.schema';
 import { TransactionService } from '../transaction/transaction.service';
-// import { Transaction, TransactionDocument } from '../transaction/schemas/transaction.schema';
-import { RealtimeGateway } from '../realtime/realtime.gateway';
+
 import { CurrencyService } from '../currency/currency.service';
 import { User } from '../user/entities/user/user'; 
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, QueryRunner, Repository } from 'typeorm';
+import { startOfMonth, endOfMonth } from 'date-fns'; 
 
+import { In, Between } from 'typeorm';
 
-import { Transaction } from '../transaction/entities/transaction'; // Import Transaction entity
+import { Transaction } from '../transaction/entities/transaction'; 
 
 @Injectable()
 export class WalletService {
   constructor(
     @InjectModel(Wallet.name) private walletModel: Model<Wallet>,
     @InjectConnection() private connection: Connection,
-    // @InjectModel(Transaction.name) private readonly transactionModel: Model<TransactionDocument>, 
     private readonly transactionService: TransactionService,
-    private readonly realtimeGateway: RealtimeGateway,
     private readonly currencyService: CurrencyService,
     @InjectRepository(User) private readonly userRepository: Repository<User>, 
-    private readonly dataSource: DataSource, // For SQL Transaction management
-    @InjectRepository(Transaction) private readonly transactionRepository: Repository<Transaction>, // Inject TransactionRepository
+    private readonly dataSource: DataSource, 
+    // @InjectRepository(Transaction) private readonly transactionRepository: Repository<Transaction>, 
+    @InjectModel(Transaction.name) private transactionModel: Model<Transaction>,
+
   ) {}
 
 
@@ -56,249 +58,350 @@ export class WalletService {
   }
 
   
-  // 3. Transfer Money Between Wallets
-  async transferMoney(
-    userId: string,
-    fromWallet: string,
-    toWallet: string,
-    amount: number,
-    fromCurrency: string,
-    toCurrency: string,
-    recipientName: string,
-  ): Promise<{ message: string; details: any }> {
-    const queryRunner = this.dataSource.createQueryRunner();
-    await queryRunner.connect();
-    await queryRunner.startTransaction();
+
+    // 3. Transfer Money Between Wallets for MongoDB
+    async transferMoney(
+      userId: string,
+      fromWallet: string,
+      toWallet: string,
+      amount: number,
+      fromCurrency: string,
+      toCurrency: string,
+      recipientName: string,
+    ): Promise<{ message: string; details: any }> {
+      // Start MongoDB session for transaction
+      const session = await this.connection.startSession();
+      session.startTransaction();
   
-    try {
-      // Fetch sender and recipient wallets
-      const senderWallet = await this.walletModel.findOne({ walletNumber: fromWallet, user: userId });
-      const receiverWallet = await this.walletModel.findOne({ walletNumber: toWallet });
+      try {
+        // Fetch sender and recipient wallets with session
+        const senderWallet = await this.walletModel.findOne(
+          { walletNumber: fromWallet, user: userId }
+        ).session(session);
+        
+        const receiverWallet = await this.walletModel.findOne(
+          { walletNumber: toWallet }
+        ).session(session);
   
-      if (!senderWallet || !receiverWallet) {
-        throw new BadRequestException('One or both wallets do not exist');
-      }
+        if (!senderWallet || !receiverWallet) {
+          throw new BadRequestException('One or both wallets do not exist');
+        }
   
-      // Check if sender wallet currency matches fromCurrency
-      if (senderWallet.currency !== fromCurrency) {
-        throw new BadRequestException(
-          `Sender wallet currency mismatch. Expected ${senderWallet.currency}, but got ${fromCurrency}`
+        // Validate currencies
+        if (senderWallet.currency !== fromCurrency) {
+          throw new BadRequestException(`Sender wallet currency mismatch`);
+        }
+        if (receiverWallet.currency !== toCurrency) {
+          throw new BadRequestException(`Recipient wallet currency mismatch`);
+        }
+  
+        // Validate recipient name
+        const recipientUser = await this.userRepository.findOne({ 
+          where: { id: Number(receiverWallet.user) } 
+        });
+        if (!recipientUser || recipientUser.name !== recipientName) {
+          throw new BadRequestException('Recipient name and wallet number do not match');
+        }
+  
+        // Check sender balance
+        if (senderWallet.balance < amount) {
+          throw new BadRequestException('Insufficient balance');
+        }
+  
+        // Perform currency conversion
+        const conversionRate = await this.currencyService.getConversionRate(
+          fromCurrency, 
+          toCurrency
         );
-      }
+        const convertedAmount = amount * conversionRate;
   
-      // Check if recipient wallet currency matches toCurrency
-      if (receiverWallet.currency !== toCurrency) {
-        throw new BadRequestException(
-          `Recipient wallet currency mismatch. Expected ${receiverWallet.currency}, but got ${toCurrency}`
-        );
-      }
-  
-      // Verify recipient name
-      const recipientUser = await this.userRepository.findOne({ where: { id: Number(receiverWallet.user) } });
-      if (!recipientUser || recipientUser.name !== recipientName) {
-        throw new BadRequestException('Recipient name and wallet number do not match');
-      }
-  
-      if (senderWallet.balance < amount) {
-        throw new BadRequestException('Insufficient balance');
-      }
-  
-      // Perform currency conversion
-      const conversionRate = await this.currencyService.getConversionRate(fromCurrency, toCurrency);
-      const convertedAmount = amount * conversionRate;
-  
-      // Update balances
-      senderWallet.balance -= amount;
-      receiverWallet.balance += convertedAmount;
-  
-      await senderWallet.save();
-      await receiverWallet.save();
-  
-      // Log transaction using SQL
-      const transactionRepository = queryRunner.manager.getRepository(Transaction);
-      const transaction = transactionRepository.create({
-        transactionId: Date.now().toString(),
-        senderWallet: fromWallet,
-        recipientWallet: toWallet,
-        recipientName,
-        senderCurrency: fromCurrency,
-        recipientCurrency: toCurrency,
-        amountSent: amount,
-        amountReceived: convertedAmount,
-        conversionRate,
-        status: 'Success',
-        timestamp: new Date(),
-      });
-  
-      await transactionRepository.save(transaction);
-  
-      await queryRunner.commitTransaction();
-  
-      return {
-        message: 'Transfer successful',
-        details: {
-          fromWallet: senderWallet.walletNumber,
-          toWallet: receiverWallet.walletNumber,
-          amount,
-          convertedAmount,
-          fromCurrency,
-          toCurrency,
+        // Create transaction record
+        const transaction = await this.transactionModel.create([{
+          transactionId: Date.now().toString(),
+          senderWallet: fromWallet,
+          recipientWallet: toWallet,
+          recipientName,
+          senderCurrency: fromCurrency,
+          recipientCurrency: toCurrency,
+          amountSent: amount,
+          amountReceived: convertedAmount,
           conversionRate,
-          timestamp: transaction.timestamp,
-        },
-      };
-    } catch (error) {
-      await queryRunner.rollbackTransaction();
-      throw error;
-    } finally {
-      await queryRunner.release();
-    }
-  }
+          status: 'Pending',
+          timestamp: new Date(),
+        }], { session });
   
-// async transferMoney(
-//   userId: string,
-//   fromWallet: string,
-//   toWallet: string,
-//   amount: number,
-//   fromCurrency: string,
-//   toCurrency: string,
-//   recipientName: string,
-// ): Promise<{ message: string; details: any }> {
-//   const queryRunner = this.dataSource.createQueryRunner();
-//   await queryRunner.connect();
-//   await queryRunner.startTransaction();
-
-//   try {
-//     // Fetch sender and recipient wallets
-//     const senderWallet = await this.walletModel.findOne({ walletNumber: fromWallet, user: userId });
-//     const receiverWallet = await this.walletModel.findOne({ walletNumber: toWallet });
-
-//     if (!senderWallet || !receiverWallet) {
-//       throw new BadRequestException('One or both wallets do not exist');
-//     }
-
-//     // Verify recipient name
-//     const recipientUser = await this.userRepository.findOne({ where: { id: Number(receiverWallet.user) } });
-//     if (!recipientUser || recipientUser.name !== recipientName) {
-//       throw new BadRequestException('Recipient name and wallet number do not match');
-//     }
-
-//     if (senderWallet.balance < amount) {
-//       throw new BadRequestException('Insufficient balance');
-//     }
-
-//     // Perform currency conversion
-//     const conversionRate = await this.currencyService.getConversionRate(fromCurrency, toCurrency);
-//     const convertedAmount = amount * conversionRate;
-
-//     // Update balances
-//     senderWallet.balance -= amount;
-//     receiverWallet.balance += convertedAmount;
-
-//     await senderWallet.save();
-//     await receiverWallet.save();
-
-//     // Log transaction using SQL
-//     const transactionRepository = queryRunner.manager.getRepository(Transaction);
-//     const transaction = transactionRepository.create({
-//       transactionId: Date.now().toString(),
-//       senderWallet: fromWallet,
-//       recipientWallet: toWallet,
-//       recipientName,
-//       senderCurrency: fromCurrency,
-//       recipientCurrency: toCurrency,
-//       amountSent: amount,
-//       amountReceived: convertedAmount,
-//       conversionRate,
-//       status: 'Success',
-//       timestamp: new Date(),
-//     });
-
-//     await transactionRepository.save(transaction);
-
-//     await queryRunner.commitTransaction();
-
-//     return {
-//       message: 'Transfer successful',
-//       details: {
-//         fromWallet: senderWallet.walletNumber,
-//         toWallet: receiverWallet.walletNumber,
-//         amount,
-//         convertedAmount,
-//         fromCurrency,
-//         toCurrency,
-//         conversionRate,
-//         timestamp: transaction.timestamp,
-//       },
-//     };
-//   } catch (error) {
-//     await queryRunner.rollbackTransaction();
-//     throw error;
-//   } finally {
-//     await queryRunner.release();
-//   }
-// }
+        // Update balances atomically
+        await this.walletModel.updateOne(
+          { walletNumber: fromWallet },
+          { $inc: { balance: -amount } },
+          { session }
+        );
+  
+        await this.walletModel.updateOne(
+          { walletNumber: toWallet },
+          { $inc: { balance: convertedAmount } },
+          { session }
+        );
+  
+        // Update transaction status to Success
+        await this.transactionModel.updateOne(
+          { _id: transaction[0]._id },
+          { $set: { status: 'Success' } },
+          { session }
+        );
+  
+        // Commit the transaction
+        await session.commitTransaction();
+  
+        return {
+          message: 'Transfer successful',
+          details: {
+            transactionId: transaction[0].transactionId,
+            fromWallet: senderWallet.walletNumber,
+            toWallet: receiverWallet.walletNumber,
+            amount,
+            convertedAmount,
+            fromCurrency,
+            toCurrency,
+            conversionRate,
+            timestamp: transaction[0].timestamp,
+          },
+        };
+  
+      } catch (error) {
+        // Rollback the transaction
+        await session.abortTransaction();
+        throw error;
+      } finally {
+        session.endSession();
+      }
+    }
+  
 
 
-// --- Private Helper Methods ---
 
-  // private async validateSenderWallet(userId: string, fromWallet: string, session: any) {
-  //   const senderWallet = await this.walletModel.findOne({ walletNumber: fromWallet, user: userId }).session(session);
-  //   if (!senderWallet) throw new BadRequestException('Sender wallet not found');
-  //   return senderWallet;
-  // }
-
-  // private async validateReceiverWallet(toWallet: string, recipientName: string, session: any) {
-  //   const receiverWallet = await this.walletModel.findOne({ walletNumber: toWallet }).session(session);
-  //   if (!receiverWallet) throw new BadRequestException('Recipient wallet not found');
-
-  //   const recipientUser = await this.userRepository.findOne({ where: { id: Number(receiverWallet.user) } });
-  //   if (!recipientUser || recipientUser.name !== recipientName) {
-  //     throw new BadRequestException('Recipient name and wallet number do not match');
-  //   }
-
-  //   return receiverWallet;
-  // }
-
-  // private ensureSufficientBalance(wallet: Wallet, amount: number) {
-  //   if (wallet.balance < amount) {
-  //     throw new BadRequestException('Insufficient balance');
-  //   }
-  // }
-
-  // private async updateBalances(senderWallet: Wallet, receiverWallet: Wallet, amount: number, convertedAmount: number, session: any) {
-  //   senderWallet.balance -= amount;
-  //   receiverWallet.balance += convertedAmount;
-
-  //   await senderWallet.save({ session });
-  //   await receiverWallet.save({ session });
-  // }
-
-  // private async logTransaction(
-  //   senderWallet: Wallet,
-  //   receiverWallet: Wallet,
-  //   amountSent: number,
-  //   amountReceived: number,
-  //   conversionRate: number,
+  // 3. Transfer Money Between Wallets for SQL
+  // async transferMoney(
+  //   userId: string,
+  //   fromWallet: string,
+  //   toWallet: string,
+  //   amount: number,
   //   fromCurrency: string,
   //   toCurrency: string,
   //   recipientName: string,
-  //   session: any,
-  // ) {
-  //   const transaction = new this.transactionModel({
-  //     transactionId: Date.now().toString(),
-  //     senderWallet: senderWallet.walletNumber,
-  //     recipientWallet: receiverWallet.walletNumber,
-  //     recipientName,
-  //     senderCurrency: fromCurrency,
-  //     recipientCurrency: toCurrency,
-  //     amountSent,
-  //     amountReceived,
-  //     conversionRate,
-  //     status: 'Success',
-  //     timestamp: new Date(),
-  //   });
-  //   await transaction.save({ session });
-  //}
+  // ): Promise<{ message: string; details: any }> {
+  //   const queryRunner = this.dataSource.createQueryRunner();
+  //   await queryRunner.connect();
+  //   await queryRunner.startTransaction();
+  
+  //   try {
+  //     // Fetch sender and recipient wallets
+  //     const senderWallet = await this.walletModel.findOne({ walletNumber: fromWallet, user: userId });
+  //     const receiverWallet = await this.walletModel.findOne({ walletNumber: toWallet });
+  
+  //     if (!senderWallet || !receiverWallet) {
+  //       throw new BadRequestException('One or both wallets do not exist');
+  //     }
+  
+  //     // Validate currencies
+  //     if (senderWallet.currency !== fromCurrency) {
+  //       throw new BadRequestException(`Sender wallet currency mismatch. Expected ${senderWallet.currency}, got ${fromCurrency}`);
+  //     }
+  //     if (receiverWallet.currency !== toCurrency) {
+  //       throw new BadRequestException(`Recipient wallet currency mismatch. Expected ${receiverWallet.currency}, got ${toCurrency}`);
+  //     }
+  
+  //     // Validate recipient name
+  //     const recipientUser = await this.userRepository.findOne({ where: { id: Number(receiverWallet.user) } });
+  //     if (!recipientUser || recipientUser.name !== recipientName) {
+  //       throw new BadRequestException('Recipient name and wallet number do not match');
+  //     }
+  
+  //     // Check sender balance
+  //     if (senderWallet.balance < amount) {
+  //       throw new BadRequestException('Insufficient balance');
+  //     }
+  
+  //     // Perform currency conversion
+  //     const conversionRate = await this.currencyService.getConversionRate(fromCurrency, toCurrency);
+  //     const convertedAmount = amount * conversionRate;
+  
+  //     // Update balances
+  //     senderWallet.balance -= amount;
+  //     receiverWallet.balance += convertedAmount;
+  
+  //     // Save wallet updates
+  //     await senderWallet.save();
+  //     await receiverWallet.save();
+  
+  //     // Log transaction in SQL
+  //     const transaction = this.transactionRepository.create({
+  //       transactionId: Date.now().toString(),
+  //       senderWallet: fromWallet,
+  //       recipientWallet: toWallet,
+  //       recipientName,
+  //       senderCurrency: fromCurrency,
+  //       recipientCurrency: toCurrency,
+  //       amountSent: amount,
+  //       amountReceived: convertedAmount,
+  //       conversionRate,
+  //       status: 'Success',
+  //       timestamp: new Date(),
+  //     });
+  
+  //     await queryRunner.manager.save(transaction);
+  
+  //     await queryRunner.commitTransaction();
+  
+
+  //     return {
+  //       message: 'Transfer successful',
+  //       details: {
+  //         fromWallet: senderWallet.walletNumber,
+  //         toWallet: receiverWallet.walletNumber,
+  //         amount,
+  //         convertedAmount,
+  //         fromCurrency,
+  //         toCurrency,
+  //         conversionRate,
+  //         timestamp: transaction.timestamp,
+  //       },
+  //     };
+  //   } catch (error) {
+  //     await queryRunner.rollbackTransaction();
+  //     throw error;
+  //   } finally {
+  //     await queryRunner.release();
+  //   }
+  // }
+  
+
+    /**
+   * Get total balances, monthly incoming, and monthly outgoing in USD for a user.
+   */
+    //mongodb:
+    async getFinancialOverview(userId: string): Promise<{
+      totalBalanceInUSD: number;
+      monthlyIncomingInUSD: number;
+      monthlyOutgoingInUSD: number;
+    }> {
+      // Get all user wallets
+      const { wallets } = await this.getWalletsForUser(userId);
+      const walletNumbers = wallets.map(w => w.walletNumber);
+
+      // Calculate total balance in USD
+      let totalBalanceInUSD = 0;
+      for (const wallet of wallets) {
+        const conversionRate = await this.currencyService.getConversionRate(
+          wallet.currency, 
+          'USD'
+        );
+        totalBalanceInUSD += wallet.balance * conversionRate;
+      }
+
+      // Get monthly date range
+      const now = new Date();
+      const monthStart = startOfMonth(now);
+      const monthEnd = endOfMonth(now);
+
+      // Get monthly transactions
+      const incomingTransactions = await this.transactionModel.find({
+        recipientWallet: { $in: walletNumbers },
+        timestamp: { $gte: monthStart, $lte: monthEnd },
+        status: 'Success'
+      });
+
+      const outgoingTransactions = await this.transactionModel.find({
+        senderWallet: { $in: walletNumbers },
+        timestamp: { $gte: monthStart, $lte: monthEnd },
+        status: 'Success'
+      });
+
+      // Calculate USD amounts
+      let monthlyIncomingInUSD = 0;
+      for (const tx of incomingTransactions) {
+        const conversionRate = await this.currencyService.getConversionRate(
+          tx.recipientCurrency, 
+          'USD'
+        );
+        monthlyIncomingInUSD += tx.amountReceived * conversionRate;
+      }
+
+      let monthlyOutgoingInUSD = 0;
+      for (const tx of outgoingTransactions) {
+        const conversionRate = await this.currencyService.getConversionRate(
+          tx.senderCurrency, 
+          'USD'
+        );
+        monthlyOutgoingInUSD += tx.amountSent * conversionRate;
+      }
+
+      return {
+        totalBalanceInUSD: parseFloat(totalBalanceInUSD.toFixed(2)),
+        monthlyIncomingInUSD: parseFloat(monthlyIncomingInUSD.toFixed(2)),
+        monthlyOutgoingInUSD: parseFloat(monthlyOutgoingInUSD.toFixed(2)),
+      };
+    }
+
+
+
+  // sql
+    // async getFinancialOverview(userId: string): Promise<{
+    //   totalBalanceInUSD: number;
+    //   monthlyIncomingInUSD: number;
+    //   monthlyOutgoingInUSD: number;
+    // }> {
+    //   // 1. Get all user wallets
+    //   const { wallets } = await this.getWalletsForUser(userId);
+    //   const walletNumbers = wallets.map(w => w.walletNumber);
+  
+    //   // 2. Calculate total balance in USD
+    //   let totalBalanceInUSD = 0;
+    //   for (const wallet of wallets) {
+    //     const conversionRate = await this.currencyService.getConversionRate(wallet.currency, 'USD');
+    //     totalBalanceInUSD += wallet.balance * conversionRate;
+    //   }
+  
+    //   // 3. Determine monthly time range (current month)
+    //   const now = new Date();
+    //   const monthStart = startOfMonth(now);
+    //   const monthEnd = endOfMonth(now);
+  
+    //   // 4. Fetch monthly transactions where user is recipient (Incoming)
+    //   const incomingTransactions = await this.transactionRepository.find({
+    //     where: {
+    //       recipientWallet: In(walletNumbers),
+    //       timestamp: Between(monthStart, monthEnd)
+    //     },
+    //   });
+  
+    //   let monthlyIncomingInUSD = 0;
+    //   for (const tx of incomingTransactions) {
+    //     const conversionRate = await this.currencyService.getConversionRate(tx.recipientCurrency, 'USD');
+    //     monthlyIncomingInUSD += tx.amountReceived * conversionRate;
+    //   }
+  
+    //   // 5. Fetch monthly transactions where user is sender (Outgoing)
+    //   const outgoingTransactions = await this.transactionRepository.find({
+    //     where: {
+    //       senderWallet: In(walletNumbers),
+    //       timestamp: Between(monthStart, monthEnd),
+    //     },
+    //   });
+  
+    //   let monthlyOutgoingInUSD = 0;
+    //   for (const tx of outgoingTransactions) {
+    //     const conversionRate = await this.currencyService.getConversionRate(tx.senderCurrency, 'USD');
+    //     monthlyOutgoingInUSD += tx.amountSent * conversionRate;
+    //   }
+  
+    //   return {
+    //     totalBalanceInUSD: parseFloat(totalBalanceInUSD.toFixed(2)),
+    //     monthlyIncomingInUSD: parseFloat(monthlyIncomingInUSD.toFixed(2)),
+    //     monthlyOutgoingInUSD: parseFloat(monthlyOutgoingInUSD.toFixed(2)),
+    //   };
+    // }
+ 
+ 
 }
 

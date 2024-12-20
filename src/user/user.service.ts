@@ -45,4 +45,12 @@ export class UserService {
   async findByEmail(email: string): Promise<User | undefined> {
     return this.userRepository.findOne({ where: { email } });
   }
+
+    /**
+   * Find a user by ID
+   * @param id - User's unique identifier
+   */
+  async findById(id: number): Promise<User | undefined> {
+    return this.userRepository.findOne({ where: { id } });
+  }
 }

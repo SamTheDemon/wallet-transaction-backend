@@ -20,12 +20,14 @@ import { CurrencyService } from 'src/currency/currency.service';
 
 @Module({
   imports: [
-    MongooseModule.forFeature([{ name: Wallet.name, schema: WalletSchema }]),
+    MongooseModule.forFeature([{ name: Wallet.name, schema: WalletSchema },       { name: Transaction.name, schema: TransactionSchema }  // Add this line
+    ]),
     TransactionModule, 
     RealtimeModule,
     RedisModule,
     CurrencyModule,
     UserModule, 
+    
     TypeOrmModule.forFeature([User]),
   ],
   providers: [WalletService, CurrencyService, RealtimeGateway],

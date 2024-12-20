@@ -1,7 +1,6 @@
+// transaction.schema.ts
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document } from 'mongoose';
-
-export type TransactionDocument = Transaction & Document;
 
 @Schema()
 export class Transaction extends Document {
@@ -17,28 +16,26 @@ export class Transaction extends Document {
   @Prop({ required: true })
   recipientName: string;
 
-
   @Prop({ required: true })
   senderCurrency: string;
 
   @Prop({ required: true })
   recipientCurrency: string;
 
-  @Prop({ required: true })
-  amountSent: number; 
+  @Prop({ required: true, type: Number })
+  amountSent: number;
 
-  @Prop({ required: true })
+  @Prop({ required: true, type: Number })
   amountReceived: number;
 
-  @Prop({ required: true })
+  @Prop({ required: true, type: Number })
   conversionRate: number;
 
   @Prop({ required: true })
   status: string;
 
-  @Prop({ default: Date.now })
+  @Prop({ required: true, default: Date.now })
   timestamp: Date;
-
 }
 
 export const TransactionSchema = SchemaFactory.createForClass(Transaction);

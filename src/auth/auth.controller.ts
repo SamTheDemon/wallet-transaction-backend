@@ -1,8 +1,10 @@
-import { Controller, Post, Body, UsePipes, ValidationPipe } from '@nestjs/common';
+import { Controller, Post, Body, UsePipes, ValidationPipe, UseGuards, Req, UnauthorizedException } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { UserService } from '../user/user.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
+import { JwtAuthGuard } from './jwt-auth.guard';
+import { AuthModule } from './auth.module';
 
 @Controller('auth') 
 export class AuthController {
@@ -13,11 +15,6 @@ export class AuthController {
   ) {}
 
 
-    /**
-   * User registration endpoint
-   * @param userDto - Registration data
-   * @returns User details excluding password
-   */
     @Post('register')
     @UsePipes(ValidationPipe)
     async register(@Body() userDto: RegisterDto) {
@@ -29,18 +26,50 @@ export class AuthController {
       };
     }
 
-/**
-    * User login endpoint
-    * @param loginDto - Login credentials
-    * @returns JWT access token
-    */
+
     @Post('login')
     @UsePipes(ValidationPipe)
     async login(@Body() loginDto: LoginDto) {
       const user = await this.authService.validateUser(loginDto.email, loginDto.password);
+      const tokens = await this.authService.login(user);
       return {
         message: 'Login successful',
-        data: await this.authService.login(user),
+        data: tokens,
       };
     }
+    
+
+    @UseGuards(JwtAuthGuard)
+    @Post('logout')
+    logout(@Req() req) {
+      const token = req.headers.authorization?.split(' ')[1];
+      if (!token) {
+        throw new UnauthorizedException('Token not provided');
+      }
+      this.authService.logout(token);
+      return { message: 'Logout successful' };
+    }
+
+   @Post('refresh-token')
+  async refreshToken(@Body('refresh_token') refreshToken: string) {
+    const validated = this.authService.validateRefreshToken(refreshToken);
+
+    if (!validated) {
+      throw new UnauthorizedException('Invalid or expired refresh token');
+    }
+
+    const user = await this.userService.findById(validated.userId);
+    const newAccessToken = this.authService.login({
+      id: user.id,
+      email: user.email,
+      name: user.name,
+    });
+
+    return {
+      message: 'Token refreshed successfully',
+      data: {
+        access_token: (await newAccessToken).access_token,
+      },
+    };
+  }
 }

@@ -2,16 +2,17 @@ import { Controller, Get, Query, UseGuards, Request } from '@nestjs/common';
 import { TransactionService } from './transaction.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
+
 @Controller('transaction')
 export class TransactionController {
   constructor(private readonly transactionService: TransactionService) {}
 
-  @UseGuards(JwtAuthGuard)
+ @UseGuards(JwtAuthGuard)
   @Get('all')
   async getAllTransactions(
     @Request() req,
-    @Query('page') page: number ,
-    @Query('limit') limit: number,
+    @Query('page') page = 1,
+    @Query('limit') limit = 10,
     @Query('senderWallet') senderWallet?: string,
     @Query('recipientWallet') recipientWallet?: string,
     @Query('startDate') startDate?: string,
@@ -21,8 +22,9 @@ export class TransactionController {
     @Query('status') status?: string,
   ) {
     const userId = String(req.user.id);
-    const { transactions, total } = await this.transactionService.getTransactionsForUser(userId, page, limit);
-    return this.transactionService.getFilteredTransactions({
+
+    // If filters are provided, call the filtered transactions service
+    const filterOptions = {
       userId,
       senderWallet,
       recipientWallet,
@@ -33,6 +35,25 @@ export class TransactionController {
       status,
       page,
       limit,
-    });
+    };
+
+    const result = senderWallet || recipientWallet || startDate || endDate || minAmount || maxAmount || status
+      ? await this.transactionService.getFilteredTransactions(filterOptions)
+      : await this.transactionService.getTransactionsForUser(userId, page, limit);
+
+    return {
+      transactions: result.transactions,
+      total: result.total,
+      page,
+      limit,
+    };
   }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('7days-overview')
+  async getLast7DaysOverview(@Request() req) {
+    const userId = String(req.user.id);
+    return this.transactionService.getLast7DaysOverview(userId);
+  }
+
 }

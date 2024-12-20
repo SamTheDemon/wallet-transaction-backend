@@ -49,5 +49,13 @@ export class WalletController {
       body.recipientName,
     );
   }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('overview')
+  async getFinancialOverview(@Request() req) {
+    const userId = String(req.user.id);
+    const overview = await this.walletService.getFinancialOverview(userId);
+    return overview;
+  }
   
 }

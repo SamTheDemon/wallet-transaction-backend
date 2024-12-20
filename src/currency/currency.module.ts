@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { CurrencyService } from './currency.service';
-import { RedisModule } from '../redis/redis.module';
+import { RedisModule } from '../redis/redis.module'; 
+
 
 @Module({
   imports: [RedisModule], // Import RedisModule
