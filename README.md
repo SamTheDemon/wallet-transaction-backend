@@ -1,99 +1,77 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# Wallet and Transaction Management System
+proof of concept to evaluate development skills in building a full-stack application.
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+This project is wallet and transaction management system built with:
+- Backend: NestJS SQL PostgreSQL, and MongoDB.
+- Frontend: Vue.js
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://coveralls.io/github/nestjs/nest?branch=master" target="_blank"><img src="https://coveralls.io/repos/github/nestjs/nest/badge.svg?branch=master#9" alt="Coverage" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+## Table of Contents
+- [Prerequisites](#prerequisites)
+- [Installation](#installation)
+- [Environment Variables](#environment-variables)
+- [Usage](#usage)
+- [Features](#features)
 
-## Description
+## Prerequisites
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+### backend: 
+- Node.js (v16+)
+- npm
+- MongoDB (v5+) and Mongoose 10.1.0
+- Redis 4.7.0
+- PostgreSQL 
 
-## Project setup
+#### Key Dependencies:
+1. 1NestJS Core Packages: @nestjs/common, @nestjs/core, etc.
+    2. MongoDB: Managed using @nestjs/mongoose and mongoose.
+    3. Redis: Managed using ioredis.
+    4. JWT Authentication: @nestjs/jwt, passport, and related packages.
+    5. TypeORM (Optional): You still have typeorm and pg installed. Ensure these are not unused.
+    6. Other Utilities:
+    7. bcrypt: For password hashing.
+    8. date-fns: For date manipulation.
+    9. axios: For HTTP requests.
+    10. ESLint and Prettier: For linting and formatting.
 
-```bash
-$ npm install
-```
+## Installation
+1. Clone the repository:
+   ```bash
+   git clone 
+   cd repo-name
 
-## Compile and run the project
+2. Back-end installation:
+-  Go to the back-end directory in a new terminal keep the front-end terminal running: `cd .\wallet-transaction-backend\`
+- Install dependencies: `npm install`
+- Confirm environment variables `.env` file is located in: directory of  `\wallet-transaction-backend\` 
+- Run the server: `npm run start`
 
-```bash
-# development
-$ npm run start
+Note to be able to test the endpoint you need to have the backend server and redis up and running
 
-# watch mode
-$ npm run start:dev
 
-# production mode
-$ npm run start:prod
-```
+## environment-variables
+In case if the `.env` file is not in the `\wallet-transaction-backend\` directory,
+ you can create a new `.env` and set the following:
+ - a `JWT_SECRET=YOUR_JWT_SECRET`. 
+ - `DB_HOST=localhost`
+- `DB_PORT=5432`
+- `DB_USERNAME=YOUR_DB_USERNAME`
+- `DB_PASSWORD=YOUR_DB_PASSWORD`
+- `DB_NAME=wallet_transaction_db`
+- `MONGO_URI= YOUR_MONGO_URL/wallet_system`
 
-## Run tests
+## features
+- this allows User to:
+1. signup
+2. signin
+3. create a new wallet, with different currrancies. 
+4. send money to other wallets with real time currancy convertion rates.
+5. View Incoming, and Outoging Transactions.
+6. dashboard with the following features:
+- Calcaulate Available Balance of all wallets IN USD.
+- Calcaulate Incoming of this Month in USD.
+- Calcaulate Outgoing of this Month in USD.
+- an interactive financial graph shows the Incoming and Outgoing for the last 7 days.
+- a Quick look into recent Transactions.
 
-```bash
-# unit tests
-$ npm run test
 
-# e2e tests
-$ npm run test:e2e
 
-# test coverage
-$ npm run test:cov
-```
-
-## Deployment
-
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
-
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
-
-```bash
-$ npm install -g mau
-$ mau deploy
-```
-
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
-
-## Resources
-
-Check out a few resources that may come in handy when working with NestJS:
-
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
-
-## Support
-
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
-
-## Stay in touch
-
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
-
-## License
-
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
