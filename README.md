@@ -9,7 +9,6 @@ This project is wallet and transaction management system built with:
 - [Prerequisites](#prerequisites)
 - [Installation](#installation)
 - [Environment Variables](#environment-variables)
-- [Usage](#usage)
 - [Features](#features)
 
 ## Prerequisites
@@ -22,22 +21,21 @@ This project is wallet and transaction management system built with:
 - PostgreSQL 
 
 #### Key Dependencies:
-1. 1NestJS Core Packages: @nestjs/common, @nestjs/core, etc.
-    2. MongoDB: Managed using @nestjs/mongoose and mongoose.
-    3. Redis: Managed using ioredis.
-    4. JWT Authentication: @nestjs/jwt, passport, and related packages.
-    5. TypeORM (Optional): You still have typeorm and pg installed. Ensure these are not unused.
-    6. Other Utilities:
-    7. bcrypt: For password hashing.
-    8. date-fns: For date manipulation.
-    9. axios: For HTTP requests.
-    10. ESLint and Prettier: For linting and formatting.
+1. NestJS Core Packages: @nestjs/common, @nestjs/core, etc.
+2. MongoDB: Managed using @nestjs/mongoose and mongoose.
+3. Redis: Managed using ioredis.
+4. JWT Authentication: @nestjs/jwt, passport, and related packages.
+5. TypeORM (Optional): You still have typeorm and pg installed. Ensure these are not unused.
+6. Other Utilities:
+7. bcrypt: For password hashing.
+8. date-fns: For date manipulation.
+9. axios: For HTTP requests.
+10. ESLint and Prettier: For linting and formatting.
 
 ## Installation
 1. Clone the repository:
    ```bash
    git clone 
-   cd repo-name
 
 2. Back-end installation:
 -  Go to the back-end directory in a new terminal keep the front-end terminal running: `cd .\wallet-transaction-backend\`
@@ -67,11 +65,11 @@ In case if the `.env` file is not in the `\wallet-transaction-backend\` director
 4. send money to other wallets with real time currancy convertion rates.
 5. View Incoming, and Outoging Transactions.
 6. dashboard with the following features:
-- Calcaulate Available Balance of all wallets IN USD.
-- Calcaulate Incoming of this Month in USD.
-- Calcaulate Outgoing of this Month in USD.
-- an interactive financial graph shows the Incoming and Outgoing for the last 7 days.
-- a Quick look into recent Transactions.
+    - Calcaulate Available Balance of all wallets IN USD.
+    - Calcaulate Incoming of this Month in USD.
+    - Calcaulate Outgoing of this Month in USD.
+    - an interactive financial graph shows the Incoming and Outgoing for the last 7 days.
+    - a Quick look into recent Transactions.
 
 
 
